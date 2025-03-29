@@ -1,0 +1,47 @@
+{
+  "__type__": "cc.Material",
+  "_name": "",
+  "_objFlags": 0,
+  "__editorExtras__": {},
+  "_native": "",
+  "_effectAsset": {
+    "__uuid__": "ef52610b-449d-41e6-a4a3-e4b00763558c",
+    "__expectedType__": "cc.EffectAsset"
+  },
+  "_techIdx": 0,
+  "_defines": [
+    {}
+  ],
+  "_states": [
+    {
+      "rasterizerState": {},
+      "depthStencilState": {},
+      "blendState": {
+        "targets": [
+          {}
+        ]
+      }
+    }
+  ],
+  "_props": [
+    {
+      "mainTexture": {
+        "__uuid__": "f741e31c-fdbf-4adb-bf89-454dbac1c481@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      "rainTexture": {
+        "__uuid__": "d29967b5-aa4f-4f15-9a3e-5443b8d9b74e@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      "snowTexture": {
+        "__uuid__": "f38c78bb-d068-4fc4-bfc2-62aa61d560d8@6c48a",
+        "__expectedType__": "cc.Texture2D"
+      },
+      "snowSpeed": 2,
+      "rainScale": 4,
+      "snowScale": 3,
+      "rainIntensity": 0.3,
+      "windDirection": 137
+    }
+  ]
+}

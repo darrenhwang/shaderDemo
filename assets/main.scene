@@ -4464,13 +4464,19 @@
     "_enabled": true,
     "__prefab": null,
     "buttonPrefab": {
-      "__uuid__": "90bdd2a9-2838-4888-b66c-e94c8b7a5169",
+      "__uuid__": "cd319291-96c9-492a-91b9-71f01c4153d5",
       "__expectedType__": "cc.Prefab"
     },
     "categoryContainers": [
-      null,
-      null,
-      null
+      {
+        "__id__": 13
+      },
+      {
+        "__id__": 23
+      },
+      {
+        "__id__": 33
+      }
     ],
     "categoryToggles": [
       {
