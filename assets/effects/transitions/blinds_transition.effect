@@ -1,0 +1,97 @@
+CCEffect %{
+  techniques:
+  - name: transparent
+    passes:
+    - vert: unlit-vs:vert
+      frag: unlit-fs:frag
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      properties:
+        mainTexture: { value: white }
+        nextTexture: { value: white }
+        progress: { value: 0.0, editor: { type: float, range: [0, 1], slide: true } }
+        stripeCount: { value: 10, editor: { type: float, range: [1, 50], slide: true } }
+        stripeWidth: { value: 0.5, editor: { type: float, range: [0, 1], slide: true } }
+        edgeSoftness: { value: 0.1, editor: { type: float, range: [0, 1], slide: true } }
+        direction: { value: 0, editor: { type: float, range: [0, 1], slide: true } }
+}%
+
+CCProgram unlit-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec2 v_uv0;
+  out vec4 v_color;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    pos = cc_matWorld * pos;
+    pos = cc_matViewProj * pos;
+    v_uv0 = a_texCoord;
+    v_color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram unlit-fs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+
+  in vec2 v_uv0;
+  in vec4 v_color;
+
+  uniform sampler2D mainTexture;
+  uniform sampler2D nextTexture;
+  uniform Constant {
+    float progress;
+    float stripeCount;
+    float stripeWidth;
+    float edgeSoftness;
+    float direction;
+  };
+
+  // 平滑过渡函数
+  float smoothStep(float edge0, float edge1, float x) {
+    float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+  }
+
+  vec4 frag () {
+    // 计算UV坐标
+    vec2 uv = v_uv0;
+    if (direction > 0.5) {
+      uv = vec2(uv.y, uv.x); // 水平百叶窗
+    }
+    
+    // 计算条纹
+    float stripe = fract(uv.y * stripeCount);
+    float edge = smoothStep(progress - edgeSoftness, progress, stripe);
+    float mask = smoothStep(progress, progress + stripeWidth, stripe);
+    
+    // 采样两个场景
+    vec4 currentScene = texture(mainTexture, v_uv0);
+    vec4 nextScene = texture(nextTexture, v_uv0);
+    
+    // 混合场景
+    vec4 finalColor = mix(currentScene, nextScene, mask);
+    finalColor *= v_color;
+    
+    // 应用边缘过渡
+    finalColor.a *= edge;
+    
+    return finalColor;
+  }
+}% 

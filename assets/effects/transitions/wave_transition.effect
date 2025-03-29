@@ -1,0 +1,119 @@
+CCEffect %{
+  techniques:
+  - name: transparent
+    passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      properties:
+        mainTexture: { value: white }
+        secondTexture: { value: white }
+        progress: { value: 0.0, editor: { type: float, range: [0, 1], slide: true } }
+        waveCount: { value: 3.0, editor: { type: float, range: [1, 10], slide: true } }
+        waveAmplitude: { value: 0.1, editor: { type: float, range: [0, 0.5], slide: true } }
+        waveSpeed: { value: 1.0, editor: { type: float, range: [0, 5.0], slide: true } }
+        direction: { value: 0.0, editor: { type: float, range: [0, 360], step: 1 } }
+        edgeWidth: { value: 0.05, editor: { type: float, range: [0, 0.2], slide: true } }
+        edgeColorR: { value: 1.0, editor: { type: float, range: [0, 1], slide: true } }
+        edgeColorG: { value: 1.0, editor: { type: float, range: [0, 1], slide: true } }
+        edgeColorB: { value: 1.0, editor: { type: float, range: [0, 1], slide: true } }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec2 v_uv0;
+  out vec4 v_color;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    pos = cc_matWorld * pos;
+    pos = cc_matViewProj * pos;
+    v_uv0 = a_texCoord;
+    v_color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+
+  in vec2 v_uv0;
+  in vec4 v_color;
+
+  uniform sampler2D mainTexture;
+  uniform sampler2D secondTexture;
+  
+  uniform Constant {
+    float progress;
+    float waveCount;
+    float waveAmplitude;
+    float waveSpeed;
+    float direction;
+    float edgeWidth;
+    float edgeColorR;
+    float edgeColorG;
+    float edgeColorB;
+  };
+
+  // 计算旋转后的UV坐标
+  vec2 rotateUV(vec2 uv, float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    vec2 center = vec2(0.5, 0.5);
+    return center + vec2(
+      c * (uv.x - center.x) - s * (uv.y - center.y),
+      s * (uv.x - center.x) + c * (uv.y - center.y)
+    );
+  }
+
+  vec4 frag () {
+    // 将UV坐标旋转到指定方向
+    float angle = direction * 3.14159 / 180.0;
+    vec2 rotatedUV = rotateUV(v_uv0, angle);
+    
+    // 计算波浪效果，包含动画
+    float time = cc_time.x * waveSpeed;
+    float wave = sin(rotatedUV.x * waveCount * 6.28318 + time) * waveAmplitude;
+    
+    // 带波浪的过渡
+    float adjustedY = rotatedUV.y + wave;
+    float threshold = progress;
+    
+    // 计算遮罩和边缘
+    float mask = step(threshold, adjustedY);
+    
+    // 简单边缘检测
+    float edge = 0.0;
+    if (abs(adjustedY - threshold) < edgeWidth) {
+        edge = 1.0;
+    }
+    
+    // 混合两个场景
+    vec4 currentScene = texture(mainTexture, v_uv0);
+    vec4 nextScene = texture(secondTexture, v_uv0);
+    vec4 finalColor = mix(nextScene, currentScene, mask);
+    
+    // 添加边缘发光
+    vec3 edgeColor = vec3(edgeColorR, edgeColorG, edgeColorB);
+    finalColor.rgb = mix(finalColor.rgb, edgeColor, edge);
+    
+    return finalColor * v_color;
+  }
+}% 

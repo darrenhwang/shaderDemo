@@ -1,0 +1,135 @@
+CCEffect %{
+  techniques:
+  - name: transparent
+    passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      properties:
+        mainTexture: { value: white }
+        secondTexture: { value: white }
+        progress: { value: 0.0, editor: { type: float, range: [0, 1], slide: true } }
+        centerX: { value: 0.5, editor: { type: float, range: [0, 1], slide: true } }
+        centerY: { value: 0.5, editor: { type: float, range: [0, 1], slide: true } }
+        edgeWidth: { value: 0.1, editor: { type: float, range: [0, 0.5], slide: true } }
+        edgeColor: { value: [1.0, 1.0, 1.0, 1.0], editor: { type: color } }
+        isReverse: { value: 0, editor: { type: int, range: [0, 1], step: 1 } }
+        edgeBrightness: { value: 1.0, editor: { type: float, range: [0, 2], slide: true } }
+        debugMode: { value: 0, editor: { type: int, range: [0, 3], step: 1 } }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec2 v_uv0;
+  out vec4 v_color;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    pos = cc_matWorld * pos;
+    pos = cc_matViewProj * pos;
+    v_uv0 = a_texCoord;
+    v_color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+
+  in vec2 v_uv0;
+  in vec4 v_color;
+
+  uniform sampler2D mainTexture;
+  uniform sampler2D secondTexture;
+  
+  uniform Constant {
+    float progress;
+    float centerX;
+    float centerY;
+    float edgeWidth;
+    vec4 edgeColor;
+    int isReverse;
+    float edgeBrightness;
+    int debugMode;
+  };
+
+  vec4 frag () {
+    // 采样两个纹理
+    vec4 currentScene = texture(mainTexture, v_uv0);
+    vec4 nextScene = texture(secondTexture, v_uv0);
+    
+    // 计算到中心点的距离
+    vec2 center = vec2(centerX, centerY);
+    float dist = distance(v_uv0, center);
+    
+    // 计算有效半径，最大为sqrt(2)（对角线距离）
+    float maxRadius = sqrt(2.0);
+    float radius = progress * maxRadius;
+    
+    // 计算平滑圆形遮罩
+    float mask;
+    if (isReverse == 1) {
+      // 反向过渡：从外到内
+      mask = 1.0 - smoothstep(radius - edgeWidth, radius, dist);
+    } else {
+      // 正向过渡：从内到外
+      mask = smoothstep(radius - edgeWidth, radius, dist);
+    }
+    
+    // 计算边缘发光强度
+    float edgeWidth2 = edgeWidth * 0.5;
+    float edge;
+    if (isReverse == 1) {
+      // 反向过渡的边缘
+      edge = smoothstep(radius, radius + edgeWidth2, dist) * 
+            (1.0 - smoothstep(radius + edgeWidth2, radius + edgeWidth, dist));
+    } else {
+      // 正向过渡的边缘
+      edge = smoothstep(radius - edgeWidth, radius - edgeWidth2, dist) * 
+            (1.0 - smoothstep(radius - edgeWidth2, radius, dist));
+    }
+    
+    // 调试模式
+    if (debugMode == 1) {
+      // 调试模式1: 仅显示遮罩
+      return vec4(vec3(mask), 1.0) * v_color;
+    } else if (debugMode == 2) {
+      // 调试模式2: 仅显示边缘
+      return vec4(vec3(edge), 1.0) * v_color;
+    } else if (debugMode == 3) {
+      // 调试模式3: 显示距离
+      return vec4(vec3(dist / maxRadius), 1.0) * v_color;
+    }
+    
+    // 标准模式: 完整效果
+    // 混合两个场景
+    vec3 mixedColor = mix(nextScene.rgb, currentScene.rgb, mask);
+    
+    // 添加边缘发光
+    edge *= edgeBrightness; // 控制边缘亮度
+    mixedColor = mix(mixedColor, edgeColor.rgb, edge);
+    
+    // 计算最终颜色
+    vec4 finalColor = vec4(mixedColor, mix(nextScene.a, currentScene.a, mask));
+    finalColor *= v_color;
+    
+    return finalColor;
+  }
+}% 
